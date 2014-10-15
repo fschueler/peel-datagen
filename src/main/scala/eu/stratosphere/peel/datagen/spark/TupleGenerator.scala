@@ -19,7 +19,8 @@ object TupleGenerator {
     val KEY_N = "N"
     val KEY_DOP = "dop"
     val KEY_OUTPUT = "output"
-    val KEY_DIST = "distribution"
+    val KEY_KEYDIST = "key-distribution"
+    val KEY_AGGDIST = "aggregate-distribution"
     val KEY_PAYLOAD = "payload"
   }
 
@@ -55,9 +56,14 @@ object TupleGenerator {
         .dest(Command.KEY_PAYLOAD)
         .metavar("PAYLOAD")
         .help("length of the string value")
-      parser.addArgument(Command.KEY_DIST)
+      parser.addArgument(Command.KEY_KEYDIST)
         .`type`[String](classOf[String])
-        .dest(Command.KEY_DIST)
+        .dest(Command.KEY_KEYDIST)
+        .metavar("DISTRIBUTION")
+        .help("distribution to use for the keys")
+      parser.addArgument(Command.KEY_AGGDIST)
+        .`type`[String](classOf[String])
+        .dest(Command.KEY_AGGDIST)
         .metavar("DISTRIBUTION")
         .help("distribution to use for the keys")
     }
@@ -104,14 +110,14 @@ class TupleGenerator(master: String, dop: Int, N: Int, output: String, keyDist: 
 
   import eu.stratosphere.peel.datagen.spark.TupleGenerator.Schema.KV
 
-//  def this(ns: Namespace) = this(
-//    ns.get[String](Algorithm.Command.KEY_MASTER),
-//    ns.get[Int](TupleGenerator.Command.KEY_DOP),
-//    ns.get[Int](TupleGenerator.Command.KEY_N),
-//    ns.get[String](TupleGenerator.Command.KEY_OUTPUT),
-//    ns.get[String](TupleGenerator.Command.KEY_DIST),
-//    ns.get[Int](TupleGenerator.Command.KEY_PAYLOAD),
-//    ns.get[String](TupleGenerator.Command.KEY_DIST))
+  def this(ns: Namespace) = this(
+    ns.get[String](Algorithm.Command.KEY_MASTER),
+    ns.get[Int](TupleGenerator.Command.KEY_DOP),
+    ns.get[Int](TupleGenerator.Command.KEY_N),
+    ns.get[String](TupleGenerator.Command.KEY_OUTPUT),
+    TupleGenerator.parseDist(ns.get[String](TupleGenerator.Command.KEY_KEYDIST)),
+    ns.get[Int](TupleGenerator.Command.KEY_PAYLOAD),
+    TupleGenerator.parseDist(ns.get[String](TupleGenerator.Command.KEY_AGGDIST)))
 
   def run() = {
     val conf = new SparkConf().setAppName(new TupleGenerator.Command().name).setMaster(master)

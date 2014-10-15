@@ -9,6 +9,11 @@ import scala.util.Random
 
 object TupleGenerator {
 
+  object Patterns {
+    val Uniform = "\\bUniform\\(\\d\\)".r
+    val Gaussian = "\\bGaussian\\(\\d,\\d\\)".r
+    val Pareto = "\\bPareto\\(\\d\\)".r
+  }
   object Command {
     // argument names
     val KEY_N = "N"
@@ -50,13 +55,10 @@ object TupleGenerator {
         .dest(Command.KEY_PAYLOAD)
         .metavar("PAYLOAD")
         .help("length of the string value")
-
-      val subparser = parser.addSubparsers()
-      subparser.addParser("dist")
-        //.addArgument(Command.KEY_NORM)
-        //.`type`[String](classOf[String])
-        //.dest(Command.KEY_DIST)
-        //.metavar("DISTRIBUTION")
+      parser.addArgument(Command.KEY_DIST)
+        .`type`[String](classOf[String])
+        .dest(Command.KEY_DIST)
+        .metavar("DISTRIBUTION")
         .help("distribution to use for the keys")
     }
   }
@@ -79,29 +81,37 @@ object TupleGenerator {
     }
 
     val master: String = args(0)
-    val dop: Int = args(0).toInt
-    val N: Int = args(0).toInt
-    val output: String = args(0)
-    val keyDist: Distribution = Pareto(1) // TODO
-    val pay: Int = args(0).toInt
-    val aggDist: Int = args(0).toInt
+    val dop: Int = args(1).toInt
+    val N: Int = args(2).toInt
+    val output: String = args(3)
+    val keyDist: Distribution = parseDist(args(4))
+    val pay: Int = args(5).toInt
+    val aggDist: Distribution = parseDist(args(6))
 
-    val generator = new TupleGenerator(master, dop, N, output, keyDist, pay)
+    val generator = new TupleGenerator(master, dop, N, output, keyDist, pay, aggDist)
     generator.run()
+  }
+
+  def parseDist(s: String): Distribution = s match {
+    case Patterns.Pareto(a) => Pareto(a.toDouble)
+    case Patterns.Gaussian(a,b) => Gaussian(a.toDouble, b.toDouble)
+    case Patterns.Uniform(a) => Uniform(a.toInt)
+    case _ => Uniform(10)
   }
 }
 
-class TupleGenerator(master: String, dop: Int, N: Int, output: String, keyDist: Distribution, pay: Int, aggDist: Distribution = Uniform(0, 10)) extends Algorithm(master) with DatasetGenerator {
+class TupleGenerator(master: String, dop: Int, N: Int, output: String, keyDist: Distribution, pay: Int, aggDist: Distribution) extends Algorithm(master) with DatasetGenerator {
 
   import eu.stratosphere.peel.datagen.spark.TupleGenerator.Schema.KV
 
-  def this(ns: Namespace) = this(
-    ns.get[String](Algorithm.Command.KEY_MASTER),
-    ns.get[Int](TupleGenerator.Command.KEY_DOP),
-    ns.get[Int](TupleGenerator.Command.KEY_N),
-    ns.get[String](TupleGenerator.Command.KEY_OUTPUT),
-    ns.get[Distribution](TupleGenerator.Command.KEY_DIST),
-    ns.get[Int](TupleGenerator.Command.KEY_PAYLOAD))
+//  def this(ns: Namespace) = this(
+//    ns.get[String](Algorithm.Command.KEY_MASTER),
+//    ns.get[Int](TupleGenerator.Command.KEY_DOP),
+//    ns.get[Int](TupleGenerator.Command.KEY_N),
+//    ns.get[String](TupleGenerator.Command.KEY_OUTPUT),
+//    ns.get[String](TupleGenerator.Command.KEY_DIST),
+//    ns.get[Int](TupleGenerator.Command.KEY_PAYLOAD),
+//    ns.get[String](TupleGenerator.Command.KEY_DIST))
 
   def run() = {
     val conf = new SparkConf().setAppName(new TupleGenerator.Command().name).setMaster(master)
@@ -121,20 +131,8 @@ class TupleGenerator(master: String, dop: Int, N: Int, output: String, keyDist: 
       val rand = new RanHash(seed)
       rand.skipTo(seed + randStart)
 
-      def randomKey(): Int = kd match {
-        case Gaussian(mus, sigma) => (sigma * rand.nextGaussian()).toInt
-        case Pareto(a) => rand.nextPareto(a).toInt
-        case Uniform(a, b) => rand.nextInt(b) - a
-      }
-
-      def randomAggregate(): Int = ag match {
-        case Gaussian(mus, sigma) => (sigma * rand.nextGaussian()).toInt
-        case Pareto(a) => rand.nextPareto(a).toInt
-        case Uniform(a, b) => rand.nextInt(b)
-      }
-
       for (j <- partitionStart to (partitionStart + n)) yield {
-        KV(randomKey(), s, randomAggregate())
+        KV(keyDist.sample(rand).toInt, s, aggDist.sample(rand).toInt)
       }
     })
 

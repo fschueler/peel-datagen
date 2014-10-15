@@ -15,7 +15,7 @@ class TupleGeneratorTest extends AssertionsForJUnit {
     val pay = 5
     val dist = Pareto(1)
 
-    val gen = new TupleGenerator(master, dop, N, output, dist, pay)
+    val gen = new TupleGenerator(master, dop, N, output, dist, pay, dist)
     gen.run()
 
   }

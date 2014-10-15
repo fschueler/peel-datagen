@@ -1,6 +1,6 @@
 package eu.stratosphere.peel.datagen.spark
 
-import eu.stratosphere.peel.datagen.util.Distributions.Pareto
+import eu.stratosphere.peel.datagen.util.Distributions._
 import org.junit.Test
 import org.scalatest.junit.AssertionsForJUnit
 
@@ -13,10 +13,12 @@ class TupleGeneratorTest extends AssertionsForJUnit {
     val dop = 3
     val N = 10000
     val pay = 5
-    val dist = Pareto(1)
+    val keyDist = Pareto(1)
+    val aggDist = Uniform(20)
 
-    val gen = new TupleGenerator(master, dop, N, output, dist, pay, dist)
-    gen.run()
+//
+
+    TupleGenerator.main(Array(master, dop, N, output, keyDist, pay, aggDist).map(_.toString))
 
   }
 

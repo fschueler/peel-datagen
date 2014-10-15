@@ -138,7 +138,7 @@ class TupleGenerator(master: String, dop: Int, N: Int, output: String, keyDist: 
       rand.skipTo(seed + randStart)
 
       for (j <- partitionStart to (partitionStart + n)) yield {
-        KV(keyDist.sample(rand).toInt, s, aggDist.sample(rand).toInt)
+        KV(kd.sample(rand).toInt, s, ag.sample(rand).toInt)
       }
     })
 

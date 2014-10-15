@@ -1,6 +1,6 @@
 package eu.stratosphere.peel.datagen.spark
 
-import eu.stratosphere.peel.datagen.util.{DatasetGenerator, RanHash}
+import eu.stratosphere.peel.datagen.util.RanHash
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 import org.apache.spark.{SparkConf, SparkContext}
 
@@ -91,7 +91,7 @@ object ClusterGenerator {
   }
 }
 
-class ClusterGenerator(master: String, dop: Int, N: Int, output: String, input: String, K: Int, dim: Int) extends Algorithm(master) with DatasetGenerator {
+class ClusterGenerator(master: String, dop: Int, N: Int, output: String, input: String, K: Int, dim: Int) extends Algorithm(master) {
 
   import eu.stratosphere.peel.datagen.spark.ClusterGenerator.Schema.Point
 

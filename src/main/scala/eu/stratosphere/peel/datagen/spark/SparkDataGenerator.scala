@@ -1,6 +1,6 @@
 package eu.stratosphere.peel.datagen.spark
 
-import eu.stratosphere.peel.datagen.{Algorithm => CoreAlgorithm}
+import eu.stratosphere.peel.datagen.{DataGenerator => CoreAlgorithm}
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
 object Algorithm {

@@ -1,7 +1,7 @@
 package eu.stratosphere.peel.datagen.spark
 
 import eu.stratosphere.peel.datagen.util.Distributions._
-import eu.stratosphere.peel.datagen.util.{DatasetGenerator, RanHash}
+import eu.stratosphere.peel.datagen.util.RanHash
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 import org.apache.spark.{SparkConf, SparkContext}
 
@@ -9,12 +9,18 @@ import scala.util.Random
 
 object TupleGenerator {
 
+  object Patterns {
+    val Uniform = "\\bUniform\\(\\d\\)".r
+    val Gaussian = "\\bGaussian\\(\\d,\\d\\)".r
+    val Pareto = "\\bPareto\\(\\d\\)".r
+  }
   object Command {
     // argument names
     val KEY_N = "N"
     val KEY_DOP = "dop"
     val KEY_OUTPUT = "output"
-    val KEY_DIST = "distribution"
+    val KEY_KEYDIST = "key-distribution"
+    val KEY_AGGDIST = "aggregate-distribution"
     val KEY_PAYLOAD = "payload"
   }
 
@@ -50,13 +56,15 @@ object TupleGenerator {
         .dest(Command.KEY_PAYLOAD)
         .metavar("PAYLOAD")
         .help("length of the string value")
-
-      val subparser = parser.addSubparsers()
-      subparser.addParser("dist")
-        //.addArgument(Command.KEY_NORM)
-        //.`type`[String](classOf[String])
-        //.dest(Command.KEY_DIST)
-        //.metavar("DISTRIBUTION")
+      parser.addArgument(Command.KEY_KEYDIST)
+        .`type`[String](classOf[String])
+        .dest(Command.KEY_KEYDIST)
+        .metavar("DISTRIBUTION")
+        .help("distribution to use for the keys")
+      parser.addArgument(Command.KEY_AGGDIST)
+        .`type`[String](classOf[String])
+        .dest(Command.KEY_AGGDIST)
+        .metavar("DISTRIBUTION")
         .help("distribution to use for the keys")
     }
   }
@@ -79,19 +87,26 @@ object TupleGenerator {
     }
 
     val master: String = args(0)
-    val dop: Int = args(0).toInt
-    val N: Int = args(0).toInt
-    val output: String = args(0)
-    val keyDist: Distribution = Pareto(1) // TODO
-    val pay: Int = args(0).toInt
-    val aggDist: Int = args(0).toInt
+    val dop: Int = args(1).toInt
+    val N: Int = args(2).toInt
+    val output: String = args(3)
+    val keyDist: Distribution = parseDist(args(4))
+    val pay: Int = args(5).toInt
+    val aggDist: Distribution = parseDist(args(6))
 
-    val generator = new TupleGenerator(master, dop, N, output, keyDist, pay)
+    val generator = new TupleGenerator(master, dop, N, output, keyDist, pay, aggDist)
     generator.run()
+  }
+
+  def parseDist(s: String): Distribution = s match {
+    case Patterns.Pareto(a) => Pareto(a.toDouble)
+    case Patterns.Gaussian(a,b) => Gaussian(a.toDouble, b.toDouble)
+    case Patterns.Uniform(a) => Uniform(a.toInt)
+    case _ => Uniform(10)
   }
 }
 
-class TupleGenerator(master: String, dop: Int, N: Int, output: String, keyDist: Distribution, pay: Int, aggDist: Distribution = Uniform(0, 10)) extends Algorithm(master) with DatasetGenerator {
+class TupleGenerator(master: String, dop: Int, N: Int, output: String, keyDist: Distribution, pay: Int, aggDist: Distribution) extends Algorithm(master) {
 
   import eu.stratosphere.peel.datagen.spark.TupleGenerator.Schema.KV
 
@@ -100,8 +115,9 @@ class TupleGenerator(master: String, dop: Int, N: Int, output: String, keyDist: 
     ns.get[Int](TupleGenerator.Command.KEY_DOP),
     ns.get[Int](TupleGenerator.Command.KEY_N),
     ns.get[String](TupleGenerator.Command.KEY_OUTPUT),
-    ns.get[Distribution](TupleGenerator.Command.KEY_DIST),
-    ns.get[Int](TupleGenerator.Command.KEY_PAYLOAD))
+    TupleGenerator.parseDist(ns.get[String](TupleGenerator.Command.KEY_KEYDIST)),
+    ns.get[Int](TupleGenerator.Command.KEY_PAYLOAD),
+    TupleGenerator.parseDist(ns.get[String](TupleGenerator.Command.KEY_AGGDIST)))
 
   def run() = {
     val conf = new SparkConf().setAppName(new TupleGenerator.Command().name).setMaster(master)
@@ -114,27 +130,14 @@ class TupleGenerator(master: String, dop: Int, N: Int, output: String, keyDist: 
     val kd = this.keyDist
     val ag = this.aggDist
 
-
     val dataset = sc.parallelize(0 until dop, dop).flatMap(i => {
       val partitionStart = n * i // the index of the first point in the current partition
       val randStart = partitionStart * 2 // the start for the prng (time 2 because we need 2 numbers for each tuple)
       val rand = new RanHash(seed)
       rand.skipTo(seed + randStart)
 
-      def randomKey(): Int = kd match {
-        case Gaussian(mus, sigma) => (sigma * rand.nextGaussian()).toInt
-        case Pareto(a) => rand.nextPareto(a).toInt
-        case Uniform(a, b) => rand.nextInt(b) - a
-      }
-
-      def randomAggregate(): Int = ag match {
-        case Gaussian(mus, sigma) => (sigma * rand.nextGaussian()).toInt
-        case Pareto(a) => rand.nextPareto(a).toInt
-        case Uniform(a, b) => rand.nextInt(b)
-      }
-
       for (j <- partitionStart to (partitionStart + n)) yield {
-        KV(randomKey(), s, randomAggregate())
+        KV(kd.sample(rand).toInt, s, ag.sample(rand).toInt)
       }
     })
 

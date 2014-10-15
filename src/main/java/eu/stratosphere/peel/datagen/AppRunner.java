@@ -4,8 +4,7 @@ import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.HashMap;
 
-import eu.stratosphere.peel.datagen.*;
-import eu.stratosphere.peel.datagen.Algorithm;
+import eu.stratosphere.peel.datagen.DataGenerator;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
@@ -39,14 +38,14 @@ public final class AppRunner {
     @SuppressWarnings("unused")
     public void run(String[] args) {
 
-        HashMap<String, eu.stratosphere.peel.datagen.Algorithm.Command> commands = new HashMap<>();
+        HashMap<String, eu.stratosphere.peel.datagen.DataGenerator.Command> commands = new HashMap<>();
 
         Reflections reflections = new Reflections(commandsPacakge);
 
-        for (Class<? extends eu.stratosphere.peel.datagen.Algorithm.Command> clazz : reflections.getSubTypesOf(eu.stratosphere.peel.datagen.Algorithm.Command.class)) {
+        for (Class<? extends eu.stratosphere.peel.datagen.DataGenerator.Command> clazz : reflections.getSubTypesOf(eu.stratosphere.peel.datagen.DataGenerator.Command.class)) {
             try {
                 if (!Modifier.isAbstract(clazz.getModifiers())) {
-                    eu.stratosphere.peel.datagen.Algorithm.Command command = clazz.newInstance();
+                    eu.stratosphere.peel.datagen.DataGenerator.Command command = clazz.newInstance();
                     commands.put(command.name(), command);
                 }
             } catch (InstantiationException | IllegalAccessException e) {
@@ -74,7 +73,7 @@ public final class AppRunner {
         String[] commandKeys = commands.keySet().toArray(new String[commands.size()]);
         Arrays.sort(commandKeys);
         for (String key : commandKeys) {
-            Algorithm.Command c = commands.get(key);
+            DataGenerator.Command c = commands.get(key);
             c.setup(parser.addSubparsers().addParser(c.name(), false).help(c.description()));
         }
 

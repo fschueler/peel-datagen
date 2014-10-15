@@ -3,7 +3,7 @@ package eu.stratosphere.peel.datagen.spark
 import org.junit.Test
 import org.scalatest.junit.AssertionsForJUnit
 
-class ClusterGeneratorTest extends AssertionsForJUnit {
+class SparkClusterGeneratorTest extends AssertionsForJUnit {
 
   @Test def integrationTest() {
     val input = getClass.getResource("/clusterCenters.csv")

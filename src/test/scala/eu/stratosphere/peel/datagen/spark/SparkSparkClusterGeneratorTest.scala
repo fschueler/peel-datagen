@@ -13,7 +13,7 @@ class SparkSparkClusterGeneratorTest extends AssertionsForJUnit {
     val dop = 3
     val N = 9999
 
-    val gen = new SparkClusterGenerator(master, dop, N, output, input.toString)
+    val gen = new SparkClusterGenerator(master, dop, N, input.toString, output)
     gen.run()
 
   }

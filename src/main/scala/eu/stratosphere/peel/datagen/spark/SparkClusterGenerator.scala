@@ -56,7 +56,7 @@ object SparkClusterGenerator {
   object Schema {
 
     case class Point(id: Int, clusterID: Int, vec: Array[Double]) {
-      override def toString = s"$id, $clusterID, ${vec.mkString(",")}"
+      override def toString = s"$id,$clusterID,${vec.mkString(",")}"
     }
 
   }
@@ -67,17 +67,17 @@ object SparkClusterGenerator {
     }
 
     val master: String = args(0)
-    val dop: Int = args(0).toInt
-    val N: Int = args(0).toInt
-    val output: String = args(0)
-    val input: String = args(0)
+    val dop: Int = args(1).toInt
+    val N: Int = args(2).toInt
+    val input: String = args(3)
+    val output: String = args(4)
 
-    val generator = new SparkClusterGenerator(master, dop, N, output, input)
+    val generator = new SparkClusterGenerator(master, dop, N, input, output)
     generator.run()
   }
 }
 
-class SparkClusterGenerator(master: String, dop: Int, N: Int, output: String, input: String) extends SparkDataGenerator(master) {
+class SparkClusterGenerator(master: String, dop: Int, N: Int, input: String, output: String) extends SparkDataGenerator(master) {
 
   import eu.stratosphere.peel.datagen.spark.SparkClusterGenerator.Schema.Point
 
@@ -85,15 +85,15 @@ class SparkClusterGenerator(master: String, dop: Int, N: Int, output: String, in
     ns.get[String](SparkDataGenerator.Command.KEY_MASTER),
     ns.get[Int](SparkClusterGenerator.Command.KEY_DOP),
     ns.get[Int](SparkClusterGenerator.Command.KEY_N),
-    ns.get[String](SparkClusterGenerator.Command.KEY_OUTPUT),
-    ns.get[String](SparkClusterGenerator.Command.KEY_INPUT))
+    ns.get[String](SparkClusterGenerator.Command.KEY_INPUT),
+    ns.get[String](SparkClusterGenerator.Command.KEY_OUTPUT))
 
   def run() = {
     val conf = new SparkConf().setAppName(new SparkClusterGenerator.Command().name).setMaster(master)
     val sc = new SparkContext(conf)
 
     // cluster centers
-    val csv = sc.textFile(input).map { line =>
+    val csv = sc.textFile(if (input.startsWith("/")) s"file:$input" else input).map { line =>
       line.split(",").map(_.toDouble)
     }.collect()
 

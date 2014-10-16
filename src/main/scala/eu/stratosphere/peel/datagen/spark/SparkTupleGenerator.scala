@@ -89,12 +89,12 @@ object SparkTupleGenerator {
     val master: String = args(0)
     val dop: Int = args(1).toInt
     val N: Int = args(2).toInt
-    val output: String = args(3)
-    val keyDist: Distribution = parseDist(args(4))
-    val pay: Int = args(5).toInt
-    val aggDist: Distribution = parseDist(args(6))
+    val keyDist: Distribution = parseDist(args(3))
+    val pay: Int = args(4).toInt
+    val aggDist: Distribution = parseDist(args(5))
+    val output: String = args(6)
 
-    val generator = new SparkTupleGenerator(master, dop, N, output, keyDist, pay, aggDist)
+    val generator = new SparkTupleGenerator(master, dop, N, keyDist, pay, aggDist, output)
     generator.run()
   }
 
@@ -106,7 +106,7 @@ object SparkTupleGenerator {
   }
 }
 
-class SparkTupleGenerator(master: String, dop: Int, N: Int, output: String, keyDist: Distribution, pay: Int, aggDist: Distribution) extends SparkDataGenerator(master) {
+class SparkTupleGenerator(master: String, dop: Int, N: Int, keyDist: Distribution, pay: Int, aggDist: Distribution, output: String) extends SparkDataGenerator(master) {
 
   import eu.stratosphere.peel.datagen.spark.SparkTupleGenerator.Schema.KV
 
@@ -114,10 +114,10 @@ class SparkTupleGenerator(master: String, dop: Int, N: Int, output: String, keyD
     ns.get[String](SparkDataGenerator.Command.KEY_MASTER),
     ns.get[Int](SparkTupleGenerator.Command.KEY_DOP),
     ns.get[Int](SparkTupleGenerator.Command.KEY_N),
-    ns.get[String](SparkTupleGenerator.Command.KEY_OUTPUT),
     SparkTupleGenerator.parseDist(ns.get[String](SparkTupleGenerator.Command.KEY_KEYDIST)),
     ns.get[Int](SparkTupleGenerator.Command.KEY_PAYLOAD),
-    SparkTupleGenerator.parseDist(ns.get[String](SparkTupleGenerator.Command.KEY_AGGDIST)))
+    SparkTupleGenerator.parseDist(ns.get[String](SparkTupleGenerator.Command.KEY_AGGDIST)),
+    ns.get[String](SparkTupleGenerator.Command.KEY_OUTPUT))
 
   def run() = {
     val conf = new SparkConf().setAppName(new SparkTupleGenerator.Command().name).setMaster(master)

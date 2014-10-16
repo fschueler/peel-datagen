@@ -7,7 +7,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.util.Random
 
-object TupleGenerator {
+object SparkTupleGenerator {
 
   object Patterns {
     val Uniform = "\\bUniform\\(\\d\\)".r
@@ -24,7 +24,7 @@ object TupleGenerator {
     val KEY_PAYLOAD = "payload"
   }
 
-  class Command extends Algorithm.Command[TupleGenerator]() {
+  class Command extends SparkDataGenerator.Command[SparkTupleGenerator]() {
 
     // algorithm names
     override def name = "TupleGenerator"
@@ -83,7 +83,7 @@ object TupleGenerator {
 
   def main(args: Array[String]): Unit = {
     if (args.length != 7) {
-      throw new RuntimeException("Arguments count !- 7")
+      throw new RuntimeException("Arguments count != 7")
     }
 
     val master: String = args(0)
@@ -94,7 +94,7 @@ object TupleGenerator {
     val pay: Int = args(5).toInt
     val aggDist: Distribution = parseDist(args(6))
 
-    val generator = new TupleGenerator(master, dop, N, output, keyDist, pay, aggDist)
+    val generator = new SparkTupleGenerator(master, dop, N, output, keyDist, pay, aggDist)
     generator.run()
   }
 
@@ -106,21 +106,21 @@ object TupleGenerator {
   }
 }
 
-class TupleGenerator(master: String, dop: Int, N: Int, output: String, keyDist: Distribution, pay: Int, aggDist: Distribution) extends Algorithm(master) {
+class SparkTupleGenerator(master: String, dop: Int, N: Int, output: String, keyDist: Distribution, pay: Int, aggDist: Distribution) extends SparkDataGenerator(master) {
 
-  import eu.stratosphere.peel.datagen.spark.TupleGenerator.Schema.KV
+  import eu.stratosphere.peel.datagen.spark.SparkTupleGenerator.Schema.KV
 
   def this(ns: Namespace) = this(
-    ns.get[String](Algorithm.Command.KEY_MASTER),
-    ns.get[Int](TupleGenerator.Command.KEY_DOP),
-    ns.get[Int](TupleGenerator.Command.KEY_N),
-    ns.get[String](TupleGenerator.Command.KEY_OUTPUT),
-    TupleGenerator.parseDist(ns.get[String](TupleGenerator.Command.KEY_KEYDIST)),
-    ns.get[Int](TupleGenerator.Command.KEY_PAYLOAD),
-    TupleGenerator.parseDist(ns.get[String](TupleGenerator.Command.KEY_AGGDIST)))
+    ns.get[String](SparkDataGenerator.Command.KEY_MASTER),
+    ns.get[Int](SparkTupleGenerator.Command.KEY_DOP),
+    ns.get[Int](SparkTupleGenerator.Command.KEY_N),
+    ns.get[String](SparkTupleGenerator.Command.KEY_OUTPUT),
+    SparkTupleGenerator.parseDist(ns.get[String](SparkTupleGenerator.Command.KEY_KEYDIST)),
+    ns.get[Int](SparkTupleGenerator.Command.KEY_PAYLOAD),
+    SparkTupleGenerator.parseDist(ns.get[String](SparkTupleGenerator.Command.KEY_AGGDIST)))
 
   def run() = {
-    val conf = new SparkConf().setAppName(new TupleGenerator.Command().name).setMaster(master)
+    val conf = new SparkConf().setAppName(new SparkTupleGenerator.Command().name).setMaster(master)
     val sc = new SparkContext(conf)
 
     val n = N / dop - 1 // number of points generated in each partition

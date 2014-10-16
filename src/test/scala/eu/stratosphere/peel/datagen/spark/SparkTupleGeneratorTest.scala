@@ -18,7 +18,7 @@ class SparkTupleGeneratorTest extends AssertionsForJUnit {
 
 //
 
-    TupleGenerator.main(Array(master, dop, N, output, keyDist, pay, aggDist).map(_.toString))
+    SparkTupleGenerator.main(Array(master, dop, N, output, keyDist, pay, aggDist).map(_.toString))
 
   }
 

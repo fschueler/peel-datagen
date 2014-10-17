@@ -1,10 +1,10 @@
 package eu.stratosphere.peel.datagen.spark
 
-import eu.stratosphere.peel.datagen.util.{DatasetGenerator, RanHash}
+import eu.stratosphere.peel.datagen.util.RanHash
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 import org.apache.spark.{SparkConf, SparkContext}
 
-object ClusterGenerator {
+object SparkClusterGenerator {
 
   object Command {
     // argument names
@@ -12,11 +12,9 @@ object ClusterGenerator {
     val KEY_DOP = "dop"
     val KEY_OUTPUT = "output"
     val KEY_INPUT = "input"
-    val KEY_K = "k"
-    val KEY_DIM = "dim"
   }
 
-  class Command extends Algorithm.Command[ClusterGenerator]() {
+  class Command extends SparkDataGenerator.Command[SparkClusterGenerator]() {
 
     // algorithm names
     override def name = "ClusterGenerator"
@@ -48,16 +46,6 @@ object ClusterGenerator {
         .dest(Command.KEY_INPUT)
         .metavar("INPUT")
         .help("input file holding the cluster centers")
-      parser.addArgument(Command.KEY_K)
-        .`type`[Int](classOf[Int])
-        .dest(Command.KEY_K)
-        .metavar("K")
-        .help("number of clusters")
-      parser.addArgument(Command.KEY_DIM)
-        .`type`[Int](classOf[Int])
-        .dest(Command.KEY_DIM)
-        .metavar("DIM")
-        .help("dimension of the cluster centers")
     }
   }
 
@@ -68,65 +56,63 @@ object ClusterGenerator {
   object Schema {
 
     case class Point(id: Int, clusterID: Int, vec: Array[Double]) {
-      override def toString = s"$id, $clusterID, ${vec.mkString(",")}"
+      override def toString = s"$id,$clusterID,${vec.mkString(",")}"
     }
 
   }
 
   def main(args: Array[String]): Unit = {
-    if (args.length != 7) {
-      throw new RuntimeException("Arguments count !- 7")
+    if (args.length != 5) {
+      throw new RuntimeException("Arguments count != 5")
     }
 
     val master: String = args(0)
-    val dop: Int = args(0).toInt
-    val N: Int = args(0).toInt
-    val output: String = args(0)
-    val input: String = args(0)
-    val K: Int = args(0).toInt
-    val dim: Int = args(0).toInt
+    val dop: Int = args(1).toInt
+    val N: Int = args(2).toInt
+    val input: String = args(3)
+    val output: String = args(4)
 
-    val generator = new ClusterGenerator(master, dop, N, output, input, K, dim)
+    val generator = new SparkClusterGenerator(master, dop, N, input, output)
     generator.run()
   }
 }
 
-class ClusterGenerator(master: String, dop: Int, N: Int, output: String, input: String, K: Int, dim: Int) extends Algorithm(master) with DatasetGenerator {
+class SparkClusterGenerator(master: String, dop: Int, N: Int, input: String, output: String) extends SparkDataGenerator(master) {
 
-  import eu.stratosphere.peel.datagen.spark.ClusterGenerator.Schema.Point
+  import eu.stratosphere.peel.datagen.spark.SparkClusterGenerator.Schema.Point
 
   def this(ns: Namespace) = this(
-    ns.get[String](Algorithm.Command.KEY_MASTER),
-    ns.get[Int](ClusterGenerator.Command.KEY_DOP),
-    ns.get[Int](ClusterGenerator.Command.KEY_N),
-    ns.get[String](ClusterGenerator.Command.KEY_OUTPUT),
-    ns.get[String](ClusterGenerator.Command.KEY_INPUT),
-    ns.get[Int](ClusterGenerator.Command.KEY_K),
-    ns.get[Int](ClusterGenerator.Command.KEY_DIM))
+    ns.get[String](SparkDataGenerator.Command.KEY_MASTER),
+    ns.get[Int](SparkClusterGenerator.Command.KEY_DOP),
+    ns.get[Int](SparkClusterGenerator.Command.KEY_N),
+    ns.get[String](SparkClusterGenerator.Command.KEY_INPUT),
+    ns.get[String](SparkClusterGenerator.Command.KEY_OUTPUT))
 
   def run() = {
-    val conf = new SparkConf().setAppName(new ClusterGenerator.Command().name).setMaster(master)
+    val conf = new SparkConf().setAppName(new SparkClusterGenerator.Command().name).setMaster(master)
     val sc = new SparkContext(conf)
 
-    val n = N / dop - 1 // number of points generated in each partition
-    val ppc = N / K // number of points per center
-    val tDim = this.dim
-    val seed = this.SEED
-
-    val csv = sc.textFile(input).map { line =>
+    // cluster centers
+    val csv = sc.textFile(if (input.startsWith("/")) s"file:$input" else input).map { line =>
       line.split(",").map(_.toDouble)
     }.collect()
+
+    val n = N / dop - 1 // number of points generated in each partition
+    val K = csv.size
+    val ppc = N / K // number of points per center
+    val tDim = csv.head.drop(2).size
+    val seed = this.SEED
 
     val centroids = sc.broadcast(csv)
 
     val dataset = sc.parallelize(0 until dop, dop).flatMap(i => {
       val partitionStart = n * i // the index of the first point in the current partition
-      val randStart = partitionStart * tDim // the start for the prng
+      val randStart = partitionStart * (tDim + 1) // the start for the prng: one points requires tDim + randoms
       val rand = new RanHash(seed)
       rand.skipTo(seed + randStart)
 
       for (j <- partitionStart to (partitionStart + n)) yield {
-        val centroidID = j / ppc
+        val centroidID = rand.nextInt(K)
         val centroid = centroids.value(centroidID)
         val id = centroid(0).toInt
         val sigma = centroid(1)

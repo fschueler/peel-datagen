@@ -4,7 +4,7 @@ import eu.stratosphere.peel.datagen.util.Distributions._
 import org.junit.Test
 import org.scalatest.junit.AssertionsForJUnit
 
-class TupleGeneratorTest extends AssertionsForJUnit {
+class SparkTupleGeneratorTest extends AssertionsForJUnit {
 
   @Test def integrationTest() {
     val output = "data/tupleGeneratorOutput"
@@ -16,10 +16,7 @@ class TupleGeneratorTest extends AssertionsForJUnit {
     val keyDist = Pareto(1)
     val aggDist = Uniform(20)
 
-//
-
-    TupleGenerator.main(Array(master, dop, N, output, keyDist, pay, aggDist).map(_.toString))
+    SparkTupleGenerator.main(Array(master, dop, N, keyDist, pay, aggDist, output).map(_.toString))
 
   }
-
 }

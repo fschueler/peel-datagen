@@ -1,8 +1,7 @@
-package eu.stratosphere.peel.datagen.spark
+package eu.stratosphere.peel.datagen.util
 
 import java.io._
 
-import eu.stratosphere.peel.datagen.util.RanHash
 import org.junit.Test
 import org.scalatest.junit.AssertionsForJUnit
 

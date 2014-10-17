@@ -2,9 +2,9 @@ package eu.stratosphere.peel.datagen
 
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
-object Algorithm {
+object DataGenerator {
 
-  abstract class Command[A <: Algorithm](implicit val m: scala.reflect.Manifest[A]) {
+  abstract class Command[A <: DataGenerator](implicit val m: scala.reflect.Manifest[A]) {
 
     /**
      * Algorithm key.
@@ -29,15 +29,16 @@ object Algorithm {
      * @param ns The parsed arguments to be passed to the algorithm constructor.
      * @return
      */
-    def instantiate(ns: Namespace): Algorithm = {
+    def instantiate(ns: Namespace): DataGenerator = {
       val constructor = m.runtimeClass.getConstructor(classOf[Namespace])
-      constructor.newInstance(ns).asInstanceOf[Algorithm]
+      constructor.newInstance(ns).asInstanceOf[DataGenerator]
     }
   }
 
 }
 
-abstract class Algorithm {
+abstract class DataGenerator {
+  val SEED = 5431423142056L
 
   def run(): Unit
 }

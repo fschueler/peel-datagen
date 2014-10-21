@@ -87,14 +87,14 @@ object SparkTupleGenerator {
     }
 
     val master: String = args(0)
-    val dop: Int = args(1).toInt
-    val N: Int = args(2).toInt
+    val numTasks: Int = args(1).toInt
+    val tuplesPerTask: Int = args(2).toInt
     val keyDist: Distribution = parseDist(args(3))
     val pay: Int = args(4).toInt
     val aggDist: Distribution = parseDist(args(5))
     val output: String = args(6)
 
-    val generator = new SparkTupleGenerator(master, dop, N, keyDist, pay, aggDist, output)
+    val generator = new SparkTupleGenerator(master, numTasks, tuplesPerTask, keyDist, pay, aggDist, output)
     generator.run()
   }
 
@@ -106,7 +106,7 @@ object SparkTupleGenerator {
   }
 }
 
-class SparkTupleGenerator(master: String, dop: Int, N: Int, keyDist: Distribution, pay: Int, aggDist: Distribution, output: String) extends SparkDataGenerator(master) {
+class SparkTupleGenerator(master: String, numTasks: Int, tuplesPerTask: Int, keyDist: Distribution, pay: Int, aggDist: Distribution, output: String) extends SparkDataGenerator(master) {
 
   import eu.stratosphere.peel.datagen.spark.SparkTupleGenerator.Schema.KV
 
@@ -123,16 +123,17 @@ class SparkTupleGenerator(master: String, dop: Int, N: Int, keyDist: Distributio
     val conf = new SparkConf().setAppName(new SparkTupleGenerator.Command().name).setMaster(master)
     val sc = new SparkContext(conf)
 
-    val n = N / dop - 1 // number of points generated in each partition
+    val n = tuplesPerTask
+    val N = tuplesPerTask * numTasks // number of points generated in total
     val s = new Random(SEED).nextString(pay)
     val seed = this.SEED
 
     val kd = this.keyDist
     val ag = this.aggDist
 
-    val dataset = sc.parallelize(0 until dop, dop).flatMap(i => {
+    val dataset = sc.parallelize(0 until numTasks, numTasks).flatMap(i => {
       val partitionStart = n * i // the index of the first point in the current partition
-      val randStart = partitionStart * 2 // the start for the prng (time 2 because we need 2 numbers for each tuple)
+      val randStart = partitionStart * 2 // the start for the prng (times 2 because we need 2 numbers for each tuple)
       val rand = new RanHash(seed)
       rand.skipTo(seed + randStart)
 

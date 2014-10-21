@@ -7,18 +7,18 @@ import org.scalatest.junit.AssertionsForJUnit
 class SparkTupleGeneratorTest extends AssertionsForJUnit {
 
   @Test def integrationTest() {
-    val output = "data/tupleGeneratorOutput"
-    val master = "local[3]"
-    // N should have a common demnominator with K and dop
-    val dop = 3
-    val N = 10000
-    val pay = 5
+    val numTasks = 4
+    val tuplesPerTask = 2500
+    val payload = 5
     val keyDist = Pareto(1)
     val aggDist = Uniform(20)
+    // master with given numTasks
+    val master = s"local[$numTasks]"
+    // input and output path
+    val input = getClass.getResource("/clusterCenters.csv")
+    val output = s"${System.getProperty("java.io.tmpdir")}/data/tupleGeneratorOutput"
 
-//
-
-    SparkTupleGenerator.main(Array(master, dop, N, keyDist, pay, aggDist, output).map(_.toString))
+    new SparkTupleGenerator(master, numTasks, tuplesPerTask, keyDist, payload, aggDist, output)
 
   }
 

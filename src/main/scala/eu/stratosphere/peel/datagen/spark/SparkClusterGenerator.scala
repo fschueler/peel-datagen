@@ -112,7 +112,7 @@ class SparkClusterGenerator(master: String, numTasks: Int, pointsPerTask: Int, i
       val rand = new RanHash(seed)
       rand.skipTo(seed + randStart)
 
-      for (j <- partitionStart to (partitionStart + n)) yield {
+      for (j <- partitionStart until (partitionStart + n)) yield {
         val centroidID = rand.nextInt(K)
         val centroid = centroids.value(centroidID)
         val id = centroid(0).toInt

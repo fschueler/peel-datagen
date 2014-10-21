@@ -137,7 +137,7 @@ class SparkTupleGenerator(master: String, numTasks: Int, tuplesPerTask: Int, key
       val rand = new RanHash(seed)
       rand.skipTo(seed + randStart)
 
-      for (j <- partitionStart to (partitionStart + n)) yield {
+      for (j <- partitionStart until (partitionStart + n)) yield {
         KV(kd.sample(rand).toInt, s, ag.sample(rand).toInt)
       }
     })

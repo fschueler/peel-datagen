@@ -32,7 +32,7 @@ object SparkClusterGenerator {
         .metavar("DOP")
         .help("degree of parallelism")
       parser.addArgument(Command.KEY_N)
-        .`type`[Int](classOf[Int])
+        .`type`[Long](classOf[Long])
         .dest(Command.KEY_N)
         .metavar("N")
         .help("number of points to generate")
@@ -55,7 +55,7 @@ object SparkClusterGenerator {
 
   object Schema {
 
-    case class Point(id: Int, clusterID: Int, vec: Array[Double]) {
+    case class Point(id: Long, clusterID: Int, vec: Array[Double]) {
       override def toString = s"$id,$clusterID,${vec.mkString(",")}"
     }
 
@@ -77,14 +77,14 @@ object SparkClusterGenerator {
   }
 }
 
-class SparkClusterGenerator(master: String, dop: Int, N: Int, input: String, output: String) extends SparkDataGenerator(master) {
+class SparkClusterGenerator(master: String, dop: Int, N: Long, input: String, output: String) extends SparkDataGenerator(master) {
 
   import eu.stratosphere.peel.datagen.spark.SparkClusterGenerator.Schema.Point
 
   def this(ns: Namespace) = this(
     ns.get[String](SparkDataGenerator.Command.KEY_MASTER),
     ns.get[Int](SparkClusterGenerator.Command.KEY_DOP),
-    ns.get[Int](SparkClusterGenerator.Command.KEY_N),
+    ns.get[Long](SparkClusterGenerator.Command.KEY_N),
     ns.get[String](SparkClusterGenerator.Command.KEY_INPUT),
     ns.get[String](SparkClusterGenerator.Command.KEY_OUTPUT))
 
@@ -99,7 +99,6 @@ class SparkClusterGenerator(master: String, dop: Int, N: Int, input: String, out
 
     val n = N / dop - 1 // number of points generated in each partition
     val K = csv.size
-    val ppc = N / K // number of points per center
     val tDim = csv.head.drop(2).size
     val seed = this.SEED
 

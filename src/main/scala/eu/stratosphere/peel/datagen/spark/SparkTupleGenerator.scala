@@ -1,27 +1,28 @@
 package eu.stratosphere.peel.datagen.spark
 
-import eu.stratosphere.peel.datagen.util.Distributions._
-import eu.stratosphere.peel.datagen.util.RanHash
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
+import org.apache.spark.mllib.random.{UniformGenerator, RandomRDDs}
 import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.util.Random
 
 object SparkTupleGenerator {
 
-  object Patterns {
-    val Uniform = "\\bUniform\\(\\d\\)".r
-    val Gaussian = "\\bGaussian\\(\\d,\\d\\)".r
-    val Pareto = "\\bPareto\\(\\d\\)".r
+  object Distributions {
+    val Uniform = "Uniform"
+    val Normal = "Gaussian"
+    val Pareto = "Pareto"
   }
+
   object Command {
     // argument names
     val KEY_N = "N"
     val KEY_DOP = "dop"
     val KEY_OUTPUT = "output"
     val KEY_KEYDIST = "key-distribution"
-    val KEY_AGGDIST = "aggregate-distribution"
     val KEY_PAYLOAD = "payload"
+    val KEY_UPPER_BOUND = "upper"
+    val KEY_LOWER_BOUND = "lower"
   }
 
   class Command extends SparkDataGenerator.Command[SparkTupleGenerator]() {
@@ -46,6 +47,16 @@ object SparkTupleGenerator {
         .dest(Command.KEY_N)
         .metavar("N")
         .help("number of points to generate")
+      parser.addArgument(Command.KEY_UPPER_BOUND)
+        .`type`[Int](classOf[Int])
+        .dest(Command.KEY_UPPER_BOUND)
+        .metavar("L")
+        .help("upper bound for the generated distribution")
+      parser.addArgument(Command.KEY_LOWER_BOUND)
+        .`type`[Int](classOf[Int])
+        .dest(Command.KEY_LOWER_BOUND)
+        .metavar("U")
+        .help("lower bound for the generated distribution")
       parser.addArgument(Command.KEY_OUTPUT)
         .`type`[String](classOf[String])
         .dest(Command.KEY_OUTPUT)
@@ -59,11 +70,6 @@ object SparkTupleGenerator {
       parser.addArgument(Command.KEY_KEYDIST)
         .`type`[String](classOf[String])
         .dest(Command.KEY_KEYDIST)
-        .metavar("DISTRIBUTION")
-        .help("distribution to use for the keys")
-      parser.addArgument(Command.KEY_AGGDIST)
-        .`type`[String](classOf[String])
-        .dest(Command.KEY_AGGDIST)
         .metavar("DISTRIBUTION")
         .help("distribution to use for the keys")
     }
@@ -82,31 +88,41 @@ object SparkTupleGenerator {
   }
 
   def main(args: Array[String]): Unit = {
-    if (args.length != 7) {
-      throw new RuntimeException("Arguments count != 7")
+    if (args.length != 8) {
+      throw new RuntimeException("Arguments count != 8")
     }
 
-    val master: String = args(0)
-    val numTasks: Int = args(1).toInt
-    val tuplesPerTask: Int = args(2).toInt
-    val keyDist: Distribution = parseDist(args(3))
-    val pay: Int = args(4).toInt
-    val aggDist: Distribution = parseDist(args(5))
-    val output: String = args(6)
+    try {
+      val master: String = args(0)
+      val numTasks: Int = args(1).toInt
+      val tuplesPerTask: Int = args(2).toInt
+      val lower = args(3).toInt
+      val upper = args(4).toInt
+      val keyDist: String =  validDistribution(args(5))
+      val pay: Int = args(6).toInt
+      val output: String = args(7)
 
-    val generator = new SparkTupleGenerator(master, numTasks, tuplesPerTask, keyDist, pay, aggDist, output)
-    generator.run()
+      val generator = new SparkTupleGenerator(master, numTasks, tuplesPerTask, lower, upper, keyDist, pay, output)
+      generator.run()
+
+    } catch {
+      case e: Exception => {
+        println("Invalid arguments for tuple generator")
+        println(e)
+        throw new IllegalStateException("Invalid arguments for tuple generator", e)
+      }
+    }
   }
 
-  def parseDist(s: String): Distribution = s match {
-    case Patterns.Pareto(a) => Pareto(a.toDouble)
-    case Patterns.Gaussian(a,b) => Gaussian(a.toDouble, b.toDouble)
-    case Patterns.Uniform(a) => Uniform(a.toInt)
-    case _ => Uniform(10)
+  def validDistribution(s: String): String = s match {
+    case d@Distributions.Pareto => d
+    case d@Distributions.Normal => d
+    case d@Distributions.Uniform => d
+    case _ => throw new IllegalArgumentException("No valid distribution. Available are: Uniform, Normal, Pareto")
   }
 }
 
-class SparkTupleGenerator(master: String, numTasks: Int, tuplesPerTask: Int, keyDist: Distribution, pay: Int, aggDist: Distribution, output: String) extends SparkDataGenerator(master) {
+class SparkTupleGenerator(master: String, numTasks: Int, tuplesPerTask: Int, lowerBound: Int, upperBound: Int, keyDist: String, pay: Int, output: String) extends SparkDataGenerator(master) {
 
   import eu.stratosphere.peel.datagen.spark.SparkTupleGenerator.Schema.KV
 
@@ -114,35 +130,69 @@ class SparkTupleGenerator(master: String, numTasks: Int, tuplesPerTask: Int, key
     ns.get[String](SparkDataGenerator.Command.KEY_MASTER),
     ns.get[Int](SparkTupleGenerator.Command.KEY_DOP),
     ns.get[Int](SparkTupleGenerator.Command.KEY_N),
-    SparkTupleGenerator.parseDist(ns.get[String](SparkTupleGenerator.Command.KEY_KEYDIST)),
+    ns.get[Int](SparkTupleGenerator.Command.KEY_LOWER_BOUND),
+    ns.get[Int](SparkTupleGenerator.Command.KEY_UPPER_BOUND),
+    SparkTupleGenerator.validDistribution(ns.get[String](SparkTupleGenerator.Command.KEY_KEYDIST)),
     ns.get[Int](SparkTupleGenerator.Command.KEY_PAYLOAD),
-    SparkTupleGenerator.parseDist(ns.get[String](SparkTupleGenerator.Command.KEY_AGGDIST)),
     ns.get[String](SparkTupleGenerator.Command.KEY_OUTPUT))
 
   def run() = {
     val conf = new SparkConf().setAppName(new SparkTupleGenerator.Command().name).setMaster(master)
     val sc = new SparkContext(conf)
 
-    val n = tuplesPerTask
-    val N = tuplesPerTask * numTasks // number of points generated in total
-    val s = new Random(SEED).nextString(pay)
-    val seed = this.SEED
+    val N: Long = tuplesPerTask.toLong * numTasks // number of points generated in total
 
-    val kd = this.keyDist
-    val ag = this.aggDist
+    val payload = new Random(SEED).nextString(pay)
+    val aggValuesGenerator = new UniformGenerator()
+    aggValuesGenerator.setSeed(SEED)
 
-    val dataset = sc.parallelize(0 until numTasks, numTasks).flatMap(i => {
-      val partitionStart = n * i // the index of the first point in the current partition
-      val randStart = partitionStart * 2 // the start for the prng (times 2 because we need 2 numbers for each tuple)
-      val rand = new RanHash(seed)
-      rand.skipTo(seed + randStart)
-
-      for (j <- partitionStart until (partitionStart + n)) yield {
-        KV(kd.sample(rand).toInt, s, ag.sample(rand).toInt)
+    val randomRDD = keyDist match {
+      case SparkTupleGenerator.Distributions.Uniform => {
+        val lower = lowerBound
+        val upper = upperBound
+        RandomRDDs.uniformRDD(sc, N, numTasks, this.SEED).map{ v =>
+          val key = (lower + (upper - lower) * v).toInt
+          val value = (aggValuesGenerator.nextValue * 1000).toInt
+          KV(key, payload, value)
+        }
       }
-    })
 
-    dataset.saveAsTextFile(output)
+      case SparkTupleGenerator.Distributions.Normal => {
+
+        // set deviation to +/- 3 standard deviations, times half the range
+        val halfRange = (upperBound - lowerBound) / 2.0
+        val mean = lowerBound + halfRange
+        val deviation = halfRange / 3.0
+
+        RandomRDDs.normalRDD(sc, N, numTasks, this.SEED).map { v =>
+          //val key = (((Math.sqrt(2.5) * v) * 100.0) + 500).toInt
+          val key = ((v * deviation) + mean).toInt
+          val value = (aggValuesGenerator.nextValue * 1000).toInt
+          KV(key, payload, value)
+        }
+      }
+
+      case SparkTupleGenerator.Distributions.Pareto => {
+        if (lowerBound <= 0)
+          throw new IllegalArgumentException("Lower bound for pareto distribution has to be > 0")
+
+        val shape = 0.01 // alpha
+        val uP = Math.pow(upperBound,shape)
+        val lP = Math.pow(lowerBound,shape)
+
+        RandomRDDs.uniformRDD(sc, N, numTasks, this.SEED).map{ v =>
+          val term = -1 * ((v * uP -  v * lP - uP) / (uP * lP))
+          val key  = Math.pow(term,(-1 / shape)).toInt
+
+          val value = (aggValuesGenerator.nextValue * 1000).toInt
+
+          KV(key, payload, value)
+        }
+      }
+    }
+
+    randomRDD.saveAsTextFile(output)
+
     sc.stop()
   }
 }

@@ -9,8 +9,8 @@ import org.scalatest.junit.AssertionsForJUnit
 class SparkSparkClusterGeneratorTest extends AssertionsForJUnit {
 
   @Test def integrationTest() {
-    val numTasks = 4
-    val tuplesPerTask = 2500
+    val numTasks = 1
+    val tuplesPerTask = 4793490 * 2
     // master with given numTasks
     val master = s"local[$numTasks]"
     // input and output path

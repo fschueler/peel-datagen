@@ -8,7 +8,7 @@ object SparkClusterGenerator {
 
   object Command {
     // argument names
-    val KEY_N = "N"
+    val KEY_N = "n"
     val KEY_DOP = "dop"
     val KEY_OUTPUT = "output"
     val KEY_INPUT = "input"
@@ -34,8 +34,8 @@ object SparkClusterGenerator {
       parser.addArgument(Command.KEY_N)
         .`type`[Long](classOf[Long])
         .dest(Command.KEY_N)
-        .metavar("N")
-        .help("number of points to generate")
+        .metavar("n")
+        .help("number of points to generate per worker")
       parser.addArgument(Command.KEY_OUTPUT)
         .`type`[String](classOf[String])
         .dest(Command.KEY_OUTPUT)
@@ -67,17 +67,17 @@ object SparkClusterGenerator {
     }
 
     val master: String = args(0)
-    val dop: Int = args(1).toInt
-    val N: Int = args(2).toInt
+    val numTasks: Int = args(1).toInt
+    val pointsPerTask: Int = args(2).toInt
     val input: String = args(3)
     val output: String = args(4)
 
-    val generator = new SparkClusterGenerator(master, dop, N, input, output)
+    val generator = new SparkClusterGenerator(master, numTasks, pointsPerTask, input, output)
     generator.run()
   }
 }
 
-class SparkClusterGenerator(master: String, dop: Int, N: Long, input: String, output: String) extends SparkDataGenerator(master) {
+class SparkClusterGenerator(master: String, numTasks: Int, pointsPerTask: Int, input: String, output: String) extends SparkDataGenerator(master) {
 
   import eu.stratosphere.peel.datagen.spark.SparkClusterGenerator.Schema.Point
 
@@ -97,20 +97,21 @@ class SparkClusterGenerator(master: String, dop: Int, N: Long, input: String, ou
       line.split(",").map(_.toDouble)
     }.collect()
 
-    val n = N / dop - 1 // number of points generated in each partition
+    val n = pointsPerTask
+    val N = pointsPerTask * numTasks // number of points generated in total
     val K = csv.size
     val tDim = csv.head.drop(2).size
     val seed = this.SEED
 
     val centroids = sc.broadcast(csv)
 
-    val dataset = sc.parallelize(0 until dop, dop).flatMap(i => {
+    val dataset = sc.parallelize(0 until numTasks, numTasks).flatMap(i => {
       val partitionStart = n * i // the index of the first point in the current partition
-      val randStart = partitionStart * (tDim + 1) // the start for the prng: one points requires tDim + randoms
+      val randStart = partitionStart * (tDim + 1) // the start for the prng: one point requires tDim + randoms
       val rand = new RanHash(seed)
       rand.skipTo(seed + randStart)
 
-      for (j <- partitionStart to (partitionStart + n)) yield {
+      for (j <- partitionStart until (partitionStart + n)) yield {
         val centroidID = rand.nextInt(K)
         val centroid = centroids.value(centroidID)
         val id = centroid(0).toInt

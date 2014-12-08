@@ -3,6 +3,10 @@ package eu.stratosphere.peel.datagen.spark
 import eu.stratosphere.peel.datagen.DataGenerator
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
+/** Represents a data-generator class for synthetic data that can be used in Peel's
+  * [[eu.stratosphere.peel.core.beans.data.GeneratedDataSet GeneratedDataSet]].
+ *
+ */
 object SparkDataGenerator {
 
   object Command {

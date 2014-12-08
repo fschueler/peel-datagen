@@ -40,6 +40,7 @@
         <junit.version>4.11</junit.version>
         <scalatest.version>2.1.7</scalatest.version>
         <specs2.version>2.3.10</specs2.version>
+        <commons-io.version>2.4</commons-io.version>
 
         <!-- Other dependencies -->
         <argparse4j.version>0.4.3</argparse4j.version>
@@ -81,6 +82,12 @@
             <version>${spark.version}</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-mllib_${spark.scala.tools.version}</artifactId>
+            <version>${spark.version}</version>
+            <scope>provided</scope>
+        </dependency>
 
         <!-- Logging -->
         <dependency>
@@ -116,6 +123,12 @@
             <groupId>org.scalatest</groupId>
             <artifactId>scalatest_${scala.tools.version}</artifactId>
             <version>${scalatest.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>${commons-io.version}</version>
             <scope>test</scope>
         </dependency>
 

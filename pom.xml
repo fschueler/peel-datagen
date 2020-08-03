@@ -28,7 +28,7 @@
         <java.version>1.7</java.version>
 
         <!-- Scala -->
-        <scala.version>2.10.3</scala.version>
+        <scala.version>2.13.3</scala.version>
         <scala.tools.version>2.10</scala.tools.version>
 
         <!-- Spark -->
